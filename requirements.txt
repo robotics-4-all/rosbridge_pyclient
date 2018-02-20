@@ -1,0 +1,4 @@
+setuptools >= 21.0.0
+ws4py == 0.4.3
+pydispatch==1.1.0
+PyDispatcher==2.0.5
