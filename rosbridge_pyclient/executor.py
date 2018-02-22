@@ -7,7 +7,8 @@ import threading
 import time
 import json
 import uuid
-from ws4py.client.threadedclient import WebSocketClient
+from ws4py.client import WebSocketBaseClient
+from ws4py.client.threadedclient import WebSocketClient as ThreadedWebSocketClient
 from ws4py.client.tornadoclient import TornadoWebSocketClient
 from ws4py import format_addresses, configure_logger
 from ws4py.manager import WebSocketManager
@@ -231,7 +232,22 @@ class ExecutorMixins(object):
             del self._subscribers[topic]
 
 
-class ExecutorThreaded(ExecutorMixins, WebSocketClient):
+class Executor(ExecutorMixins, WebSocketBaseClient):
+    """TODO"""
+    def __init__(self, ip="127.0.0.1", port=9090):
+        """Constructor.
+
+        Warning: there is a know issue regarding resolving localhost to IPv6 address.
+
+        Args:
+            ip (str, optional): Rosbridge instance IPv4/Host address. Defaults to 'localhost'.
+            port (int, optional): Rosbridge instance listening port number. Defaults to 9090.
+        """
+        ExecutorMixins.__init__(self, ip=ip, port=port)
+        WebSocketBaseClient.__init__(self, self._uri)
+
+
+class ExecutorThreaded(ExecutorMixins, ThreadedWebSocketClient):
     """Threaded implementation of the Executor class"""
     def __init__(self, ip="127.0.0.1", port=9090):
         """Constructor.
@@ -243,7 +259,7 @@ class ExecutorThreaded(ExecutorMixins, WebSocketClient):
             port (int, optional): Rosbridge instance listening port number. Defaults to 9090.
         """
         ExecutorMixins.__init__(self, ip=ip, port=port)
-        WebSocketClient.__init__(self, self._uri)
+        ThreadedWebSocketClient.__init__(self, self._uri)
 
     def start(self):
         """Start executor. Establishes connection to the ROSBridge websocket server"""
@@ -251,6 +267,11 @@ class ExecutorThreaded(ExecutorMixins, WebSocketClient):
         self._thread = threading.Thread(target=self.run_forever).start()
         while not self._connected:
             time.sleep(0.1)
+
+    def start_sync(self):
+        self.connect()
+        self.run_forever()
+
 
 
 class ExecutorTornado(ExecutorMixins, TornadoWebSocketClient):
