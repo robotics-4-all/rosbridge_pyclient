@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 """This module provides Threaded and Tornado-compatible backends
 fo the executor class.
 """
@@ -157,8 +159,16 @@ class ExecutorMixins(object):
             publisher (Publisher): The Publisher object.
         """
         topic = publisher.topic
+        self.send(json.dumps({
+            'op': 'advertise',
+            'id': publisher.advertise_id,
+            'topic': publisher.topic,
+            'type': publisher.message_type,
+            'latch': publisher.latch,
+            'queue_size': publisher.queue_size
+        }))
         if topic in self._publishers:
-            self._publishers[topic].append(publisher)
+            self._publishers.get(topic).append(publisher)
         else:
             logger.info('Advertising topic {} for publishing'.format(topic))
             self._publishers[topic] = [publisher]
@@ -170,6 +180,11 @@ class ExecutorMixins(object):
             publisher (Publisher): The Publisher object.
         """
         topic = publisher.topic
+        self.send(json.dumps({
+            'op': 'unadvertise',
+            'id': publisher.advertise_id,
+            'topic': publisher.topic
+        }))
         if topic not in self._publishers:
             return
         publishers = self._publishers.get(topic)

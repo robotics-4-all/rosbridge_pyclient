@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from __future__ import print_function
 import json
 import logging
@@ -74,22 +76,9 @@ class Publisher(object):
     def unregister(self):
         """Reduce the usage of the publisher. If the usage is 0, unadvertise this topic."""
         self._executor.unregister_publisher(self)
-        self._executor.send(json.dumps({
-            'op': 'unadvertise',
-            'id': self.advertise_id,
-            'topic': self.topic
-        }))
 
     def _register(self):
         self._executor.register_publisher(self)
-        self._executor.send(json.dumps({
-            'op': 'advertise',
-            'id': self.advertise_id,
-            'topic': self.topic,
-            'type': self.message_type,
-            'latch': self.latch,
-            'queue_size': self.queue_size
-        }))
 
     def start(self):
         self._register()
