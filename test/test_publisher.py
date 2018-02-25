@@ -24,10 +24,13 @@ class PubSubTest(unittest.TestCase):
         self._sub = Subscriber(self._exec, "/robot/test_string", "std_msgs/String")
         start = time.time()
         stop = start
-        while (stop - start) < 100:
+        while (stop - start) < 5:
+            print(stop - start)
             self._pub.publish({"data": "Publisher {0}".format(self._pub.id)})
             time.sleep(1)
+            stop = time.time()
         self._pub.unregister()
+        self._manager.stop()
 
 
 if __name__ == '__main__':
