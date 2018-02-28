@@ -30,29 +30,28 @@ class Publisher(object):
 
     @property
     def id(self):
+        """Publisher unique numerical id. Getter only"""
         return self._id
 
     @property
     def advertise_id(self):
+        """Publisher unique service advertise identifier. Getter only"""
         return self._advertise_id
 
     @property
     def queue_size(self):
+        """Queue size of the ROS Topic"""
         return self._queue_size
 
     @property
     def message_type(self):
+        """Publishing ROS message type property. e.g. 'std_msgs/String'"""
         return self._message_type
 
     @property
     def latch(self):
-        """Publishing latch status. Boolean"""
+        """Publishing latch status. Getter only property"""
         return self._latch
-
-    @property
-    def queue_size(self):
-        """Publishing topic queue size"""
-        return self._queue_size
 
     @property
     def topic(self):

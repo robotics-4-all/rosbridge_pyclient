@@ -107,7 +107,7 @@ class ExecutorMixins(object):
                 success = data.get('result')
                 values = data.get('values')
                 if service_id in self._service_clients:
-                    self._service_clients[service_id](success, values)
+                    self._service_clients[service_id].callback(success, values)
                     del self._service_clients[service_id]
             elif data.get('op') == 'call_service':
                 service_name = data.get('service')
@@ -246,6 +246,26 @@ class ExecutorMixins(object):
             }))
             del self._subscribers[topic]
 
+    def register_service_client(self, svcClient, request):
+        """Registers a new ServiceClient object. It's callback function is called as soon
+        as service responds.
+
+        Args:
+            svcClient (ServiceClient): The ServiceClient object to register.
+            request (dict): The request arguments.
+        """
+        _id = svcClient.service_id
+        _name = svcClient.name
+        if _id in self._service_clients:
+            logger.info("Something went wrong! Service client with id={0} already registered!")
+            return
+        self._service_clients[_id] = svcClient
+        self.send(json.dumps({
+            'op': 'call_service',
+            'id': _id,
+            'service': name,
+            'args': request
+        }))
 
 class Executor(ExecutorMixins, WebSocketBaseClient):
     """TODO"""
