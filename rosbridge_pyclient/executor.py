@@ -263,7 +263,7 @@ class ExecutorMixins(object):
         self.send(json.dumps({
             'op': 'call_service',
             'id': _id,
-            'service': name,
+            'service': _name,
             'args': request
         }))
 
@@ -310,10 +310,9 @@ class ExecutorThreaded(ExecutorMixins, ThreadedWebSocketClient):
         self.run_forever()
 
 
-
 class ExecutorTornado(ExecutorMixins, TornadoWebSocketClient):
     """Tornado backend implementation of the Executor class."""
-    def __init__(self, ip="127.0.0.1", port=9090):
+    def __init__(self, ip="127.0.0.1", port=9090, ioloop=None):
         """Constructor.
 
         Warning: there is a know issue regarding resolving localhost to IPv6 address.
@@ -324,7 +323,10 @@ class ExecutorTornado(ExecutorMixins, TornadoWebSocketClient):
         """
         ExecutorMixins.__init__(self, ip=ip, port=port)
         TornadoWebSocketClient.__init__(self, self._uri)
-        self._ioLoop = IOLoop.current()
+        if ioloop is None:
+            self._ioLoop = IOLoop.current()
+        else:
+            self._ioLoop = ioloop
 
     @property
     def IOLoop(self):

@@ -2,7 +2,7 @@ from __future__ import print_function
 import json
 import logging
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 class ServiceClient(object):
@@ -22,6 +22,11 @@ class ServiceClient(object):
         self._clb = None
 
     @property
+    def service_id(self):
+        """Service id, mainly used for internal rosbridge protocol implementation"""
+        return self._service_id
+
+    @property
     def id(self):
         """Service unique numerical id. Getter only property"""
         return self._id
@@ -36,20 +41,21 @@ class ServiceClient(object):
         """Service type property. Getter only"""
         return self._service_type
 
-    def call(self, req_msg, cb):
+    def call(self, req_msg, clb):
         """Send a request to the ROS service server. The callback function will be called when service responses.
         Args:
             request (dict): A request message to send,
             cb (function): A function will be called when the service server responses. callback(success, message)
         """
-        if callable(cb):
+        if callable(clb):
             self._clb = clb
             self._executor.register_service_client(self, req_msg)
 
-    @property
-    def callback(self):
+    def callback(self, result, data):
         """Registered callback function of this service client
         callback(success, message).
         Getter only property. Returns the callback function pointer.
         """
-        return self._clb
+        logger.info("Service response {0} for request with id: {1}".format(
+            "success" if result else "error", self._service_id))
+        self._clb(result, data)
