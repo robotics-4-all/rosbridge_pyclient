@@ -8,6 +8,7 @@ from pydispatch import dispatcher
 try:
     basestring
 except NameError:
+    # Python3 compatibility
     basestring = str
 
 logging.basicConfig(level=logging.INFO)

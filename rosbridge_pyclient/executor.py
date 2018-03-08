@@ -315,7 +315,7 @@ class ExecutorTornado(ExecutorMixins, TornadoWebSocketClient):
     def __init__(self, ip="127.0.0.1", port=9090, ioloop=None):
         """Constructor.
 
-        Warning: there is a know issue regarding resolving localhost to IPv6 address.
+        Warning: there is a known issue regarding resolving localhost to IPv6 address.
 
         Args:
             ip (str, optional): Rosbridge instance IPv4/Host address. Defaults to 'localhost'.
