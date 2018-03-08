@@ -43,8 +43,6 @@ class ServiceClientTest(unittest.TestCase):
         self._svc2.call(req, self._clb)
         while self._count < 2:
             time.sleep(0.1)
-            print(self._count)
-        print("ASDASD")
         self._manager.close_all()
         self._manager.stop()
         self._manager.join()

@@ -9,3 +9,4 @@ from .executor import ExecutorThreaded, ExecutorTornado, ExecutorManager, Execut
 from .publisher import Publisher
 from .subscriber import Subscriber
 from .service_client import ServiceClient
+from .rosapi import ROSApi

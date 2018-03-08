@@ -297,9 +297,9 @@ class ExecutorThreaded(ExecutorMixins, ThreadedWebSocketClient):
         ThreadedWebSocketClient.__init__(self, self._uri)
 
     def start(self):
-        """Start executor. Establishes connection to the ROSBridge websocket server"""
+        """Start executor. Establishes connection to the ROSBridge websocket server."""
         self.connect()
-        self._thread = threading.Thread(target=self.run_forever)
+        self._thread = threading.Thread(target=self.run_forever, name=self.__class__.__name__())
         self._thread.daemon = True
         self._thread.start()
         while not self._connected:
@@ -330,6 +330,7 @@ class ExecutorTornado(ExecutorMixins, TornadoWebSocketClient):
 
     @property
     def IOLoop(self):
+        """Reference to the IOLoop instance. Getter/Setter property."""
         return self._ioLoop
 
     @IOLoop.setter
@@ -352,5 +353,16 @@ class ExecutorTornado(ExecutorMixins, TornadoWebSocketClient):
 
 
 class ExecutorManager(WebSocketManager):
-    def __init__(self):
-        WebSocketManager.__init__(self, poller=None)
+    """Wraps up ws4py WebSocketManager class, mainly to provide a
+    simple graceful stop operation. And because software development is an art of mind!
+    """
+    def __init__(self, *args, **kwargs):
+        """ExecutorManager Constructor."""
+        WebSocketManager.__init__(self, poller=None, *args, **kwargs)
+
+    def kill(self):
+        """Gracefully stop all workers"""
+        self.close_all()
+        self.stop()
+        self.join()
+
