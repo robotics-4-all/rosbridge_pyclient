@@ -17,6 +17,12 @@ from ws4py.manager import WebSocketManager
 from pydispatch import dispatcher
 
 try:
+    import wsaccel
+    wsaccel.patch_ws4py()
+except ImportError as exc:
+    print("[WARNING]: wsaccel python module was not found. XOR masking optimizations wont apply!")
+
+try:
     from tornado.ioloop import IOLoop
 except ImportError as exc:
     print("[WARNING]: Install tornado to use the ExecutorTornado class, with tornado backend support.")
