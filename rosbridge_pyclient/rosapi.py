@@ -16,7 +16,6 @@ except NameError:
 
 
 class ParameterServerMixins(object):
-
     def has_param(self, param, clb=None):
         """Returns true if given ROS Parameter exists, false otherwise.
         
@@ -75,76 +74,6 @@ class ParameterServerMixins(object):
 
 
 class ServiceOperationMixins(object):
-    pass
-
-
-class TopicOperationsMixins(object):
-    pass
-
-
-class PublisherOperationsMixins(object):
-    pass
-
-
-class SubscriberOperationsMixins(object):
-    pass
-
-
-class NodeOperationsMixins(object):
-    pass
-
-
-class ROSApi(ParameterServerMixins):
-    def __init__(self, executor=None, ip="127.0.0.1", port="9090"):
-        if executor is None:
-            self._manager = ExecutorManager()
-            self._manager.start()
-            self._executor = Executor()
-            self._executor.connect()
-            self._manager.add(self._executor)
-        else:
-            self._executor = executor
-
-    def _callback(self, status, data):
-        self.__data = data
-        self.__status = status
-        self.__resF = True
-
-    def _call(self, clb, req, svc_name, svc_type):
-        svc = ServiceClient(self._executor, svc_name, svc_type)
-        if clb is None:
-            self._svc = svc
-            self.__resF = False
-            self.__data = {}
-            self.__status = -1
-            self._svc.call(req, self._callback)
-            while self.__resF is False:
-                time.sleep(0.001)
-            return self.__status, self.__data
-        return svc.call(req, clb)
-
-    def get_action_servers(self, clb=None):
-        req = {}
-        status, data = self._call(clb, req, "/rosapi/action_servers", "rosapi/GetActionServers")
-        # TODO: Does not seem to work with indigo!!!!!
-        data = data.get("*", None) if not isinstance(data, basestring) else data
-        return status, data
-
-    def get_nodes(self, clb=None):
-        """Returns a list of currently alive ROS Nodes."""
-        req = {}
-        status, data = self._call(clb, req, "/rosapi/nodes", "rosapi/Nodes")
-        data = data.get("nodes", None) if not isinstance(data, basestring) else data
-        return status, data
-
-    def get_node_details(self, node_name, clb=None):
-        """Return detailes of given node. Include list of subscribers, publishers and services."""
-        req = {
-            "node": node_name
-        }
-        status, data = self._call(clb, req, "/rosapi/node_details", "rosapi/NodeDetails")
-        return status, data
-
     def get_services(self, clb=None):
         """Returns a list of currently alive ROS Services."""
         req = {}
@@ -180,20 +109,7 @@ class ROSApi(ParameterServerMixins):
         return status, data
 
 
-    def get_publishers(self, clb=None):
-        """Returns a list of currently alive ROS Publishers."""
-        req = {}
-        status, data = self._call(clb, req, "/rosapi/publishers", "rosapi/Publishers")
-        data = data.get("publishers", None) if not isinstance(data, basestring) else data
-        return status, data
-
-    def get_subscribers(self, clb=None):
-        """Returns a list of currently alive ROS Subscribers."""
-        req = {}
-        status, data = self._call(clb, req, "/rosapi/subscribers", "rosapi/Subscribers")
-        data = data.get("subscribers", None) if not isinstance(data, basestring) else data
-        return status, data
-
+class TopicOperationsMixins(object):
     def get_topics(self, clb=None):
         """Returns a list of currently alive ROS Topics. Similar to `rostopic list`
         Args:
@@ -230,6 +146,80 @@ class ROSApi(ParameterServerMixins):
         }
         status, data = self._call(clb, req, "/rosapi/topics_for_type", "rosapi/TopicsForType")
         data = data.get("topics", None) if not isinstance(data, basestring) else data
+        return status, data
+
+
+class PublisherOperationsMixins(object):
+    def get_publishers(self, clb=None):
+        """Returns a list of currently alive ROS Publishers."""
+        req = {}
+        status, data = self._call(clb, req, "/rosapi/publishers", "rosapi/Publishers")
+        data = data.get("publishers", None) if not isinstance(data, basestring) else data
+        return status, data
+
+
+class SubscriberOperationsMixins(object):
+    def get_subscribers(self, clb=None):
+        """Returns a list of currently alive ROS Subscribers."""
+        req = {}
+        status, data = self._call(clb, req, "/rosapi/subscribers", "rosapi/Subscribers")
+        data = data.get("subscribers", None) if not isinstance(data, basestring) else data
+        return status, data
+
+
+class NodeOperationsMixins(object):
+    def get_nodes(self, clb=None):
+        """Returns a list of currently alive ROS Nodes."""
+        req = {}
+        status, data = self._call(clb, req, "/rosapi/nodes", "rosapi/Nodes")
+        data = data.get("nodes", None) if not isinstance(data, basestring) else data
+        return status, data
+
+    def get_node_details(self, node_name, clb=None):
+        """Return detailes of given node. Include list of subscribers, publishers and services."""
+        req = {
+            "node": node_name
+        }
+        status, data = self._call(clb, req, "/rosapi/node_details", "rosapi/NodeDetails")
+        return status, data
+
+
+class ROSApi(ParameterServerMixins, ServiceOperationMixins,
+             TopicOperationsMixins, PublisherOperationsMixins,
+             SubscriberOperationsMixins, NodeOperationsMixins):
+    def __init__(self, executor=None, ip="127.0.0.1", port="9090"):
+        if executor is None:
+            self._manager = ExecutorManager()
+            self._manager.start()
+            self._executor = Executor()
+            self._executor.connect()
+            self._manager.add(self._executor)
+        else:
+            self._executor = executor
+
+    def _callback(self, status, data):
+        self.__data = data
+        self.__status = status
+        self.__resF = True
+
+    def _call(self, clb, req, svc_name, svc_type):
+        svc = ServiceClient(self._executor, svc_name, svc_type)
+        if clb is None:
+            self._svc = svc
+            self.__resF = False
+            self.__data = {}
+            self.__status = -1
+            self._svc.call(req, self._callback)
+            while self.__resF is False:
+                time.sleep(0.001)
+            return self.__status, self.__data
+        return svc.call(req, clb)
+
+    def get_action_servers(self, clb=None):
+        req = {}
+        status, data = self._call(clb, req, "/rosapi/action_servers", "rosapi/GetActionServers")
+        # TODO: Does not seem to work with indigo!!!!!
+        data = data.get("*", None) if not isinstance(data, basestring) else data
         return status, data
 
     def stop(self):
