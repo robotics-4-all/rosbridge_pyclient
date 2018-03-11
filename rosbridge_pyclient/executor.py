@@ -299,7 +299,7 @@ class ExecutorThreaded(ExecutorMixins, ThreadedWebSocketClient):
     def start(self):
         """Start executor. Establishes connection to the ROSBridge websocket server."""
         self.connect()
-        self._thread = threading.Thread(target=self.run_forever, name=self.__class__.__name__())
+        self._thread = threading.Thread(target=self.run_forever, name=self.__class__.__name__)
         self._thread.daemon = True
         self._thread.start()
         while not self._connected:
