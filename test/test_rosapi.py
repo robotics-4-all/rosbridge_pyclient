@@ -9,7 +9,7 @@ from rosbridge_pyclient import ROSApi
 class ROSApiTest(unittest.TestCase):
     def setUp(self):
         self.startTime = time.time()
-        self.ros = ROSApi(ip="83.212.96.15", port="8078")
+        self.ros = ROSApi(ip="127.0.0.1", port="9090")
 
     def tearDown(self):
         t = time.time() - self.startTime

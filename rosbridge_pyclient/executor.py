@@ -129,6 +129,10 @@ class ExecutorMixins(object):
                         'values': values
                     }))
 
+    def _data_provider(self, data):
+        for i in data:
+            yield i
+
     def unhandled_error(self, error):
         """Called when a socket or OS error is raised.
 
