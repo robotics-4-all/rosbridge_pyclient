@@ -192,7 +192,7 @@ class ROSApi(ParameterServerMixins, ServiceOperationMixins,
             self._manager = ExecutorManager()
             self._manager.start()
             self._executor = Executor(ip=ip, port=port)
-            self._executor.connect()
+            self._executor.start()
             self._manager.add(self._executor)
         else:
             self._executor = executor

@@ -30,14 +30,14 @@ except ImportError as exc:
 logger = configure_logger()
 
 
-class ExecutorMixins(object):
+class ExecutorBase(object):
     """Rosbridge websocket protocol executor mixins. Manages connections to the server and all
     interactions with ROS.
 
     It keeps a record of all publishers, subscribers, service request callbacks and action clients.
 
     """
-    MAX_RETRIES = 2
+    MAX_RETRIES = 20
 
     def __init__(self, ip="127.0.0.1", port=9090):
         """Executor class constructor.
@@ -58,6 +58,14 @@ class ExecutorMixins(object):
         self._service_servers = {}
         self._action_clients = {}
         self._reconnections = 0
+
+    @property
+    def remote_uri(self):
+        return self._uri
+
+    @property
+    def connected(self):
+        return self.connected
 
     def gen_id(self):
         """Generate a new ID.
@@ -90,23 +98,38 @@ class ExecutorMixins(object):
         self._connected = False
         logger.info('Disconnected from ROSBridge: {}'.format(self._uri))
         logger.info("Reason: {0}, Code: {1}".format(reason, code))
+        logger.info("Closed down {0} - {1}\nTiming out for a bit...".format(
+            code, reason))
+        time.sleep(1)
+        logger.info("Reconnecting. . .");
+        # self.sock.shutdown(socket.SHUT_RDWR)
+        self.sock.close()
         self._reconnections += 1
         if self._reconnections == self.MAX_RETRIES:
             return
         self.connect()
 
+    def start(self, timeout=1):
+        try:
+            self.connect()
+        except Exception:
+            newTimeout = timeout + 1
+            logger.info("Timing out for {} seconds. . .".format(newTimeout))
+            time.sleep(newTimeout)
+            logger.info("Attempting to reconnect. . .")
+            self.start(newTimeout)
 
-    def received_message(self, message):
+    def received_message(self, msg):
         """Called when message is received from ROSBridge websocket server..
 
         Only handle the message with `topic` or `service` keywords and trigger corresponding callback functions.
 
         Args:
-            message(ws4py.messaging.Message): A message that sent from ROS server.
+            msg (ws4py.messaging.Message): A message that sent from ROS server.
         """
-        data = json.loads(message.data)
+        data = json.loads(msg.data)
         if 'topic' in data:
-            dispatcher.send(data.get('topic'), message=data.get('msg'))
+            dispatcher.send(data.get('topic'), msg=data.get('msg'))
         if 'service' in data:
             if data.get('op') == 'service_response':
                 service_id = data.get('id')
@@ -277,7 +300,8 @@ class ExecutorMixins(object):
             'args': request
         }))
 
-class Executor(ExecutorMixins, WebSocketBaseClient):
+
+class Executor(ExecutorBase, WebSocketBaseClient):
     """TODO"""
     def __init__(self, ip="127.0.0.1", port=9090):
         """Constructor.
@@ -288,11 +312,11 @@ class Executor(ExecutorMixins, WebSocketBaseClient):
             ip (str, optional): Rosbridge instance IPv4/Host address. Defaults to 'localhost'.
             port (int, optional): Rosbridge instance listening port number. Defaults to 9090.
         """
-        ExecutorMixins.__init__(self, ip=ip, port=port)
+        ExecutorBase.__init__(self, ip=ip, port=port)
         WebSocketBaseClient.__init__(self, self._uri)
 
 
-class ExecutorThreaded(ExecutorMixins, ThreadedWebSocketClient):
+class ExecutorThreaded(ExecutorBase, ThreadedWebSocketClient):
     """Threaded implementation of the Executor class"""
     def __init__(self, ip="127.0.0.1", port=9090):
         """Constructor.
@@ -303,7 +327,7 @@ class ExecutorThreaded(ExecutorMixins, ThreadedWebSocketClient):
             ip (str, optional): Rosbridge instance IPv4/Host address. Defaults to 'localhost'.
             port (int, optional): Rosbridge instance listening port number. Defaults to 9090.
         """
-        ExecutorMixins.__init__(self, ip=ip, port=port)
+        ExecutorBase.__init__(self, ip=ip, port=port)
         ThreadedWebSocketClient.__init__(self, self._uri)
 
     def start(self):
@@ -320,7 +344,7 @@ class ExecutorThreaded(ExecutorMixins, ThreadedWebSocketClient):
         self.run_forever()
 
 
-class ExecutorTornado(ExecutorMixins, TornadoWebSocketClient):
+class ExecutorTornado(ExecutorBase, TornadoWebSocketClient):
     """Tornado backend implementation of the Executor class."""
     def __init__(self, ip="127.0.0.1", port=9090, ioloop=None):
         """Constructor.
@@ -331,7 +355,7 @@ class ExecutorTornado(ExecutorMixins, TornadoWebSocketClient):
             ip (str, optional): Rosbridge instance IPv4/Host address. Defaults to 'localhost'.
             port (int, optional): Rosbridge instance listening port number. Defaults to 9090.
         """
-        ExecutorMixins.__init__(self, ip=ip, port=port)
+        ExecutorBase.__init__(self, ip=ip, port=port)
         TornadoWebSocketClient.__init__(self, self._uri)
         if ioloop is None:
             self._ioLoop = IOLoop.current()
