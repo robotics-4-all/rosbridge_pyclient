@@ -19,8 +19,8 @@ class PubSubTest(unittest.TestCase):
         t = time.time() - self.startTime
         print("%s: %.3f" % (self.id(), t))
 
-    def _clb(self, message):
-        print("Received Message: {0}".format(message))
+    def _clb(self, msg):
+        print("Received Message: {0}".format(msg))
 
     def test_publish_string(self):
         self._pub = Publisher(self._exec, "/robot/test_string", "std_msgs/String")

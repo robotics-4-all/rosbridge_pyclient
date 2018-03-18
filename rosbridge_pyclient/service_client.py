@@ -18,7 +18,7 @@ class ServiceClient(object):
         self._service_name = service_name
         self._service_type = service_type
         self._id = self._executor.gen_id()
-        self._service_id = 'call_service:{}:{}'.format(self._service_name, self._id)
+        self._service_id = 'service_client:{}:{}'.format(self._service_name, self._id)
         self._clb = None
 
     @property

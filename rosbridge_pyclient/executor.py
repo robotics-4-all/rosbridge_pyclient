@@ -78,6 +78,10 @@ class ExecutorBase(object):
         self._id_counter += 1
         return self._id_counter
 
+    def gen_uuid(self):
+        """Generate a new UUID."""
+        return str(uuid.uuid4())
+
     def opened(self):
         """Called when ROSBridge connection over websocket is established.
         
@@ -299,6 +303,23 @@ class ExecutorBase(object):
             'service': _name,
             'args': request
         }))
+
+    def register_action_client(self, action_client):
+        action_client.id = self.gen_uuid()
+        _id = '{}:{}'.format(action_client.server_name,
+                             action_client.action_type)
+
+        _name = action_client.server_name
+        if _id in self._action_clients:
+            logger.info("Something went wrong! Action client with id={0} already registered!")
+        else:
+            self._action_clients[_id] = action_client
+
+    def unregister_action_client(self, action_client):
+        _id = '{}:{}'.format(action_client.server_name,
+                             action_client.action_type)
+        if _id in self._action_clients:
+            del self._action_clients[_id]
 
 
 class Executor(ExecutorBase, WebSocketBaseClient):

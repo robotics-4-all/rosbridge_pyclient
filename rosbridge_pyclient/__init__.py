@@ -3,10 +3,11 @@
 
 from __future__ import absolute_import
 
-__version__ = "0.7.13"
+__version__ = "0.6.1"
 
 from .executor import ExecutorThreaded, ExecutorTornado, ExecutorManager, Executor
 from .publisher import Publisher
 from .subscriber import Subscriber
 from .service_client import ServiceClient
+from .action_client import ActionClient, Goal
 from .rosapi import ROSApi

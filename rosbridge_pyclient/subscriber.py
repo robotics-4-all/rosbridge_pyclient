@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class Subscriber(object):
-    def __init__(self, executor, topic_name, message_type, clb=None):
+    def __init__(self, executor, topic_name, message_type='', clb=None):
         """Constructor.
 
         Args:
@@ -26,12 +26,10 @@ class Subscriber(object):
         """
         self._executor = executor
         self._topic_name = topic_name
-        if clb is not None:
-            self._clb = clb
+        self._clb = clb
         self._message_type = message_type
         self._id = executor.gen_id()
         self._subscribe_id = ""
-        # Store callback function for future use
         self._register()
 
     @property
@@ -59,10 +57,9 @@ class Subscriber(object):
         if isinstance(value, basestring):
             self._subscribe_id = value
 
-    @property
-    def callback(self):
+    def callback(self, msg):
         """On-Message callback function. Getter only property"""
-        return self._clb
+        self._clb(msg)
 
     def unregister(self):
         """Remove the current callback function from listening to the topic,
@@ -71,7 +68,6 @@ class Subscriber(object):
         self._executor.unregister_subscriber(self)
 
     def _register(self):
-        """TODO"""
         self._executor.register_subscriber(self)
 
     def _clb(self, message):
