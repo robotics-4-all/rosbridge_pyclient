@@ -27,11 +27,16 @@ class ActionClientTest(unittest.TestCase):
     def _on_feedback(self, data, status):
         print("Received Feedback: {0}".format(data))
 
+    def _on_status(self, data):
+        print("Received Status: {0}".format(data))
+
     def test_fibonacci(self):
         server_name = "fibonacci"
         action_type = "demo_action_server/Fibonacci"
         self.ac = ActionClient(self._exec, server_name, action_type)
-        self.goal = Goal({'order': 7}, on_result=self._on_result, on_feedback=self._on_feedback)
+        self.goal = Goal({'order': 7}, on_result=self._on_result,
+                         on_feedback=self._on_feedback,
+                         on_status=self._on_status)
         self.ac.send_goal(self.goal)
         resF = False
         req = {

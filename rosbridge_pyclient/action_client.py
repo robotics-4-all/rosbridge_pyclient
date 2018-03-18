@@ -34,7 +34,6 @@ class ActionClient(object):
         self._goals = {}
         self._id = ""
 
-
         self._feedback_sub = Subscriber(self._executor,
                                         '{0}/feedback'.format(server_name),
                                         '{0}ActionFeedback'.format(action_type),
@@ -43,10 +42,10 @@ class ActionClient(object):
                                         '{0}/result'.format(server_name),
                                         '{0}ActionResult'.format(action_type),
                                         self.on_result)
-        #  self._status_sub = Subscriber(self._executor,
-                                        #  '{0}/status'.format(server_name),
-                                        #  '{1}Status'.format(action_type),
-                                        #  self._on_statusChanged)
+        self._status_sub = Subscriber(self._executor,
+                                        '{0}/status'.format(server_name),
+                                        'actionlib_msgs/GoalStatusArray',
+                                        self.on_statusChanged)
         self._goal_pub = Publisher(self._executor,
                                    '{0}/goal'.format(server_name),
                                    '{0}ActionGoal'.format(action_type))
@@ -70,11 +69,10 @@ class ActionClient(object):
     def id(self, val):
         self._id = val
 
-    #  def on_statusChanged(self, message):
-        #  goal = self._goals.get(message.get('status').get('goal_id').get('id'))
-        #  if goal:
-            #  goal.status_received(message.get(
-                #  'status'), message.get('status'))
+    def on_statusChanged(self, message):
+        goal = self._goals.get(message.get('status_list')[0].get('goal_id').get('id'))
+        if goal:
+            goal.status_received(message.get('status_list'))
 
     def on_feedback(self, msg):
         """Callback when a feedback message received.
@@ -132,7 +130,7 @@ class ActionClient(object):
 
 
 class Goal(object):
-    def __init__(self, message, on_result=None, on_feedback=None):
+    def __init__(self, message, on_result=None, on_feedback=None, on_status=None):
         """Constructor for _Goal
         Args:
             message (dict): The goal message to send to ROS action server.
@@ -146,6 +144,7 @@ class Goal(object):
         self._is_finished = False
         self._on_result = on_result
         self._on_feedback = on_feedback
+        self._on_status = on_status
 
     @property
     def id(self):
@@ -218,19 +217,19 @@ class Goal(object):
         if callable(self._on_feedback):
             self._on_feedback_wrap(feedback, status)
 
-    #  def status_received(self, stat, status):
-        #  """Called when a result message is received.
-        #  Args:
-            #  feedback (dict): The feedback message.
-            #  status (int): The status code. Such as:
-                #  ACTIVE = 1: The goal is currently being processed by the AS;
-                #  PREEMPTED = 2: The goal received a cancel request after it
-                    #  started executing;
-                #  SUCCEEDED = 3: The goal was achieved successfully by the AS;
-                #  ABORTED = 4: The goal was aborted during execution by the AS
-                    #  due to some failure.
-                #  For more details, refer to
-                #  http://docs.ros.org/indigo/api/actionlib_msgs/html/msg/GoalStatus.html.
-        #  """
-        #  if callable(self._on_status):
-            #  self._on_status(stat, status)
+    def status_received(self, status):
+        """Called when a result message is received.
+        Args:
+            feedback (dict): The feedback message.
+            status (int): The status code. Such as:
+                ACTIVE = 1: The goal is currently being processed by the AS;
+                PREEMPTED = 2: The goal received a cancel request after it
+                    started executing;
+                SUCCEEDED = 3: The goal was achieved successfully by the AS;
+                ABORTED = 4: The goal was aborted during execution by the AS
+                    due to some failure.
+                For more details, refer to
+                http://docs.ros.org/indigo/api/actionlib_msgs/html/msg/GoalStatus.html.
+        """
+        if callable(self._on_status):
+            self._on_status(status)
