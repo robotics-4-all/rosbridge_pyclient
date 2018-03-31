@@ -75,7 +75,7 @@ class ExecutorBase(object):
         self._service_servers = {}
         self._action_clients = {}
         self._reconnections = 0
-        self._auth_sercet = None
+        self._auth_secret = None
 
         setattr(self.__class__, "_onopen", onopen)
         setattr(self.__class__, "_onclose", onclose)
@@ -353,18 +353,23 @@ class ExecutorBase(object):
         if _id in self._action_clients:
             del self._action_clients[_id]
 
-    def authenticate(self, secret=None):
-        if secret is not None:
-            self._auth_sercet = secret
-        if self._auth_sercet is None:
+    def authenticate(self, secret=None, secret_from_file=None):
+        if secret_from_file is not None:
+            if os.path.isfile(secret_from_file):
+                with open(secret_from_file) as f:
+                    self._auth_secret = f.readline().strip("\n")
+        elif secret is not None:
+            self._auth_secret = secret
+        if self._auth_secret is None:
             return False
+        print(self._auth_secret)
         rand_hex = binascii.b2a_hex(os.urandom(15))
         user_lvl = "admin"
         dest_ip = self._remote_ip
         source_ip = get_public_ip()
         time_start = 0
         time_stop = 0
-        _str = self._auth_sercet + source_ip + dest_ip + rand_hex +\
+        _str = self._auth_secret + source_ip + dest_ip + rand_hex +\
             str(time_start) + user_lvl + str(time_stop)
         _hash = hashlib.sha512(b'{}'.format(_str)).hexdigest()
         auth_msg = {
@@ -378,6 +383,7 @@ class ExecutorBase(object):
             "end": 0
         }
         self.send(json.dumps(auth_msg))
+        return True
 
 
 class Executor(ExecutorBase, WebSocketBaseClient):
