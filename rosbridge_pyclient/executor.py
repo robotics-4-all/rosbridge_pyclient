@@ -9,12 +9,22 @@ import threading
 import time
 import json
 import uuid
-from ws4py.client import WebSocketBaseClient
-from ws4py.client.threadedclient import WebSocketClient as ThreadedWebSocketClient
-from ws4py.client.tornadoclient import TornadoWebSocketClient
-from ws4py import format_addresses, configure_logger
 from ws4py.manager import WebSocketManager
 from pydispatch import dispatcher
+import os
+import binascii
+import hashlib
+from ws4py import format_addresses, configure_logger
+from ws4py.client import WebSocketBaseClient
+from ws4py.client.threadedclient import WebSocketClient as ThreadedWebSocketClient
+try:
+    from ws4py.client.tornadoclient import TornadoWebSocketClient
+    from tornado.ioloop import IOLoop
+    TORNADO = True
+except ImportError:
+    print("[WARNING]: Install tornado to use the ExecutorTornado class, with tornado backend support.")
+    TORNADO = False
+
 
 try:
     import wsaccel
@@ -22,32 +32,39 @@ try:
 except ImportError as exc:
     print("[WARNING]: wsaccel python module was not found. XOR masking optimizations wont apply!")
 
-try:
-    from tornado.ioloop import IOLoop
-except ImportError as exc:
-    print("[WARNING]: Install tornado to use the ExecutorTornado class, with tornado backend support.")
 
 logger = configure_logger()
 
 
+def get_public_ip():
+    from urllib2 import urlopen
+    my_ip = urlopen('http://ip.42.pl/raw').read()
+    return my_ip
+
+
 class ExecutorBase(object):
-    """Rosbridge websocket protocol executor mixins. Manages connections to the server and all
-    interactions with ROS.
+    """Rosbridge websocket protocol executor mixins.
+    Manages connections to the server and all interactions with ROS.
 
-    It keeps a record of all publishers, subscribers, service request callbacks and action clients.
-
+    It keeps a record of all publishers, subscribers, service request
+    callbacks and action clients.
     """
-    MAX_RETRIES = 20
+    MAX_RECONNECTIONS = 20
 
-    def __init__(self, ip="127.0.0.1", port=9090):
+    def __init__(self, ip="127.0.0.1", port=9090, onopen=None, onclose=None):
         """Executor class constructor.
 
-        Warning: there is a know issue regarding resolving localhost to IPv6 address.
+        Warning: there is a know issue regarding resolving localhost
+        to IPv6 address.
 
         Args:
-            ip (str, optional): Rosbridge instance IPv4/Host address. Defaults to 'localhost'.
-            port (int, optional): Rosbridge instance listening port number. Defaults to 9090.
+            ip (str, optional): Rosbridge instance IPv4/Host address.
+            Defaults to 'localhost'.
+            port (int, optional): Rosbridge instance listening port number.
+            Defaults to 9090.
         """
+        self._remote_ip = ip
+        self._remote_port = port
         self._uri = "ws://{0}:{1}".format(ip, port)
         self._connected = False
         self._id_counter = 0
@@ -58,6 +75,10 @@ class ExecutorBase(object):
         self._service_servers = {}
         self._action_clients = {}
         self._reconnections = 0
+        self._auth_sercet = None
+
+        setattr(self.__class__, "_onopen", onopen)
+        setattr(self.__class__, "_onclose", onclose)
 
     @property
     def remote_uri(self):
@@ -71,7 +92,7 @@ class ExecutorBase(object):
         """Generate a new ID.
 
         Current implementation uses an auto-incremental method.
-        
+
         Returns:
             Incremental ID:
         """
@@ -84,11 +105,13 @@ class ExecutorBase(object):
 
     def opened(self):
         """Called when ROSBridge connection over websocket is established.
-        
+
         Implements the websocket onopened event handler operation.
         """
         self._connected = True
         logger.info('Connected to ROSBridge: {0}'.format(self._uri))
+        if callable(self._onopen):
+            self._onopen()
 
     def closed(self, code, reason=None):
         """Called when ROSBridge websocket connection is closed.
@@ -105,11 +128,14 @@ class ExecutorBase(object):
         logger.info("Closed down {0} - {1}\nTiming out for a bit...".format(
             code, reason))
         time.sleep(1)
-        logger.info("Reconnecting. . .");
+        logger.info("Reconnecting. . .")
         # self.sock.shutdown(socket.SHUT_RDWR)
-        self.sock.close()
+        try:
+            self.sock.close()
+        except Exception as exc:
+            pass
         self._reconnections += 1
-        if self._reconnections == self.MAX_RETRIES:
+        if self._reconnections == self.MAX_RECONNECTIONS:
             return
         self.connect()
 
@@ -125,15 +151,17 @@ class ExecutorBase(object):
 
     def received_message(self, msg):
         """Called when message is received from ROSBridge websocket server..
-
-        Only handle the message with `topic` or `service` keywords and trigger corresponding callback functions.
+        Only handle the message with `topic` or `service`
+        keywords and trigger corresponding callback functions.
 
         Args:
             msg (ws4py.messaging.Message): A message that sent from ROS server.
         """
         data = json.loads(msg.data)
+        # Handle subscriber event
         if 'topic' in data:
             dispatcher.send(data.get('topic'), msg=data.get('msg'))
+        # handle service response
         if 'service' in data:
             if data.get('op') == 'service_response':
                 service_id = data.get('id')
@@ -147,7 +175,8 @@ class ExecutorBase(object):
                 service_id = data.get('id')
                 args = data.get('args')
                 if service_name in self._service_servers:
-                    result, values = self._service_servers[service_name].run_handler(args)
+                    result, values = \
+                        self._service_servers[service_name].run_handler(args)
                     self.send(json.dumps({
                         'op': 'service_response',
                         'service': service_name,
@@ -191,7 +220,7 @@ class ExecutorBase(object):
 
     def register_publisher(self, publisher):
         """Registers a new publisher in the context of the current executor.
-        
+
         Args:
             publisher (Publisher): The Publisher object.
         """
@@ -233,7 +262,7 @@ class ExecutorBase(object):
 
     def register_subscriber(self, subscriber):
         """Registers a new subscriber in the context of the current executor
-        
+
         Args:
             subscriber (Subscriber): The subscriber object.
         """
@@ -243,7 +272,8 @@ class ExecutorBase(object):
             self._subscribers.get(topic).get('subscribers').append(subscriber)
         else:
             subscribe_id = 'subscribe:{}:{}'.format(topic, self.gen_id())
-            logger.info('Sending request to subscribe to topic {}'.format(topic))
+            logger.info('Sending request to subscribe to topic {}'.format(
+                topic))
             msg = json.dumps({
                 'op': 'subscribe',
                 'id': subscribe_id,
@@ -260,21 +290,24 @@ class ExecutorBase(object):
     def unregister_subscriber(self, subscriber):
         """Remove a callback subscriber from its topic subscription list.
 
-        If there is no callback subscribers in the subscription list. It will unsubscribe the topic.
+        If there is no callback subscribers in the subscription list.
+        It will unsubscribe the topic.
 
         Args:
-            subscriber (Subscriber): A subscriber with callback function that listen to the topic.
+            subscriber (Subscriber): A subscriber with callback function
+            that listen to the topic.
         """
         topic = subscriber.topic
         if topic not in self._subscribers:
             return
-        subscribe_id = self._subscribers.get(topic).get('subscribe_id')
+        #  subscribe_id = self._subscribers.get(topic).get('subscribe_id')
         subscribers = self._subscribers.get(topic).get('subscribers')
         if subscriber in subscribers:
             dispatcher.disconnect(subscriber.callback, signal=topic)
             subscribers.remove(subscriber)
         if len(subscribers) == 0:
-            logger.info('Sending request to unsubscribe topic {}'.format(topic))
+            logger.info('Sending request to unsubscribe topic {}'.format(
+                topic))
             del subscribers[:]
             self.send(json.dumps({
                 'op': 'unsubscribe',
@@ -284,8 +317,8 @@ class ExecutorBase(object):
             del self._subscribers[topic]
 
     def register_service_client(self, svcClient, request):
-        """Registers a new ServiceClient object. It's callback function is called as soon
-        as service responds.
+        """Registers a new ServiceClient object.
+        It's callback function is called as soon as service responds.
 
         Args:
             svcClient (ServiceClient): The ServiceClient object to register.
@@ -294,7 +327,7 @@ class ExecutorBase(object):
         _id = svcClient.service_id
         _name = svcClient.name
         if _id in self._service_clients:
-            logger.info("Something went wrong! Service client with id={0} already registered!")
+            logger.info("Service client with id={0} already registered!")
             return
         self._service_clients[_id] = svcClient
         self.send(json.dumps({
@@ -309,9 +342,8 @@ class ExecutorBase(object):
         _id = '{}:{}'.format(action_client.server_name,
                              action_client.action_type)
 
-        _name = action_client.server_name
         if _id in self._action_clients:
-            logger.info("Something went wrong! Action client with id={0} already registered!")
+            logger.info("Action client with id={0} already registered!")
         else:
             self._action_clients[_id] = action_client
 
@@ -321,38 +353,72 @@ class ExecutorBase(object):
         if _id in self._action_clients:
             del self._action_clients[_id]
 
+    def authenticate(self, secret=None):
+        if secret is not None:
+            self._auth_sercet = secret
+        if self._auth_sercet is None:
+            return False
+        rand_hex = binascii.b2a_hex(os.urandom(15))
+        user_lvl = "admin"
+        dest_ip = self._remote_ip
+        source_ip = get_public_ip()
+        time_start = 0
+        time_stop = 0
+        _str = self._auth_sercet + source_ip + dest_ip + rand_hex +\
+            str(time_start) + user_lvl + str(time_stop)
+        _hash = hashlib.sha512(b'{}'.format(_str)).hexdigest()
+        auth_msg = {
+            "op": "auth",
+            "mac": _hash,
+            "client": source_ip,
+            "dest": dest_ip,
+            "rand": rand_hex,
+            "t": 0,
+            "level": user_lvl,
+            "end": 0
+        }
+        self.send(json.dumps(auth_msg))
+
 
 class Executor(ExecutorBase, WebSocketBaseClient):
     """TODO"""
-    def __init__(self, ip="127.0.0.1", port=9090):
+    def __init__(self, *args, **kwargs):
         """Constructor.
 
-        Warning: there is a know issue regarding resolving localhost to IPv6 address.
+        Warning: there is a know issue regarding resolving localhost to
+        IPv6 address.
 
         Args:
-            ip (str, optional): Rosbridge instance IPv4/Host address. Defaults to 'localhost'.
-            port (int, optional): Rosbridge instance listening port number. Defaults to 9090.
+            ip (str, optional): Rosbridge instance IPv4/Host address.
+            Defaults to 'localhost'.
+            port (int, optional): Rosbridge instance listening port number.
+            Defaults to 9090.
         """
-        ExecutorBase.__init__(self, ip=ip, port=port)
+        ExecutorBase.__init__(self, *args, **kwargs)
         WebSocketBaseClient.__init__(self, self._uri)
 
 
 class ExecutorThreaded(ExecutorBase, ThreadedWebSocketClient):
     """Threaded implementation of the Executor class"""
-    def __init__(self, ip="127.0.0.1", port=9090):
+    def __init__(self, *args, **kwargs):
         """Constructor.
 
-        Warning: there is a know issue regarding resolving localhost to IPv6 address.
+        Warning: there is a know issue regarding resolving localhost to
+        IPv6 address.
 
         Args:
-            ip (str, optional): Rosbridge instance IPv4/Host address. Defaults to 'localhost'.
-            port (int, optional): Rosbridge instance listening port number. Defaults to 9090.
+            ip (str, optional): Rosbridge instance IPv4/Host address.
+            Defaults to 'localhost'.
+            port (int, optional): Rosbridge instance listening port number.
+            Defaults to 9090.
         """
-        ExecutorBase.__init__(self, ip=ip, port=port)
+        ExecutorBase.__init__(self, *args, **kwargs)
         ThreadedWebSocketClient.__init__(self, self._uri)
 
     def start(self):
-        """Start executor. Establishes connection to the ROSBridge websocket server."""
+        """Start executor. Establishes connection to the
+        ROSBridge websocket server.
+        """
         self.connect()
         self._thread = threading.Thread(target=self.run_forever, name=self.__class__.__name__)
         self._thread.daemon = True
@@ -365,51 +431,59 @@ class ExecutorThreaded(ExecutorBase, ThreadedWebSocketClient):
         self.run_forever()
 
 
-class ExecutorTornado(ExecutorBase, TornadoWebSocketClient):
-    """Tornado backend implementation of the Executor class."""
-    def __init__(self, ip="127.0.0.1", port=9090, ioloop=None):
-        """Constructor.
+if TORNADO:
+    class ExecutorTornado(ExecutorBase, TornadoWebSocketClient):
+        """Tornado backend implementation of the Executor class."""
+        def __init__(self, *args, **kwargs):
+            """Constructor.
 
-        Warning: there is a known issue regarding resolving localhost to IPv6 address.
+            Warning: there is a known issue regarding resolving localhost to
+            IPv6 address.
 
-        Args:
-            ip (str, optional): Rosbridge instance IPv4/Host address. Defaults to 'localhost'.
-            port (int, optional): Rosbridge instance listening port number. Defaults to 9090.
-        """
-        ExecutorBase.__init__(self, ip=ip, port=port)
-        TornadoWebSocketClient.__init__(self, self._uri)
-        if ioloop is None:
-            self._ioLoop = IOLoop.current()
-        else:
+            Args:
+                ip (str, optional): Rosbridge instance IPv4/Host address.
+                Defaults to 'localhost'.
+                port (int, optional): Rosbridge instance listening port number.
+                Defaults to 9090.
+            """
+            ioloop = kwargs.get("ioloop", None)
+            ExecutorBase.__init__(self, *args, **kwargs)
+            TornadoWebSocketClient.__init__(self, self._uri)
+            if ioloop is None:
+                self._ioLoop = IOLoop.current()
+            else:
+                self._ioLoop = ioloop
+
+        @property
+        def IOLoop(self):
+            """Reference to the IOLoop instance. Getter/Setter property."""
+            return self._ioLoop
+
+        @IOLoop.setter
+        def IOLoop(self, ioloop):
             self._ioLoop = ioloop
 
-    @property
-    def IOLoop(self):
-        """Reference to the IOLoop instance. Getter/Setter property."""
-        return self._ioLoop
+        def start(self):
+            """Start executor. Establishes connection to the ROSBridge
+            websocket server
+            """
+            self.connect()
+            if self._ioLoop._running:
+                return
+            logger.info("Starting current IOLoop.")
+            self._ioLoop.start()
 
-    @IOLoop.setter
-    def IOLoop(self, ioloop):
-        self._ioLoop = ioloop
-
-    def start(self):
-        """Start executor. Establishes connection to the ROSBridge websocket server"""
-        self.connect()
-        if self._ioLoop._running: 
-            return
-        logger.info("Starting current IOLoop.")
-        self._ioLoop.start()
-        
-    def stop(self):
-        """Stop executor and terminate the IOLoop instance."""
-        self.close()
-        logger.info("Terminating current IOLoop")
-        self._ioLoop.stop()
+        def stop(self):
+            """Stop executor and terminate the IOLoop instance."""
+            self.close()
+            logger.info("Terminating current IOLoop")
+            self._ioLoop.stop()
 
 
 class ExecutorManager(WebSocketManager):
     """Wraps up ws4py WebSocketManager class, mainly to provide a
-    simple graceful stop operation. And because software development is an art of mind!
+    simple graceful stop operation. And because software development is an
+    art of mind!
     """
     def __init__(self, *args, **kwargs):
         """ExecutorManager Constructor."""
@@ -420,4 +494,3 @@ class ExecutorManager(WebSocketManager):
         self.close_all()
         self.stop()
         self.join()
-

@@ -6,10 +6,14 @@ import unittest
 import time
 from rosbridge_pyclient import ROSApi
 
+SECRET_KEY="NfMhPEH7LmIMr57U"
+
+
 class ROSApiTest(unittest.TestCase):
     def setUp(self):
         self.startTime = time.time()
-        self.ros = ROSApi(ip="127.0.0.1", port="9090")
+        self.ros = ROSApi(ip="83.212.96.15", port="8115")
+        self.ros.authenticate(secret=SECRET_KEY)
 
     def tearDown(self):
         t = time.time() - self.startTime

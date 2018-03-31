@@ -15,6 +15,11 @@ except NameError:
     basestring = str
 
 
+class AuthenticationMixin(object):
+    def authenticate(self, secret=None):
+        self._executor.authenticate(secret)
+
+
 class ParameterServerMixins(object):
     def has_param(self, param, clb=None):
         """Returns true if given ROS Parameter exists, false otherwise.
@@ -186,7 +191,8 @@ class NodeOperationsMixins(object):
 
 class ROSApi(ParameterServerMixins, ServiceOperationMixins,
              TopicOperationsMixins, PublisherOperationsMixins,
-             SubscriberOperationsMixins, NodeOperationsMixins):
+             SubscriberOperationsMixins, NodeOperationsMixins,
+             AuthenticationMixin):
     def __init__(self, executor=None, ip="127.0.0.1", port="9090"):
         if executor is None:
             self._manager = ExecutorManager()
