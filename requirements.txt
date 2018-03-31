@@ -3,4 +3,4 @@ ws4py == 0.5.1
 wsaccel == 0.6.2
 pydispatch==1.1.0
 PyDispatcher==2.0.5
-tornado==5.0.1
+tornado
