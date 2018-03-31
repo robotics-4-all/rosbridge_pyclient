@@ -155,19 +155,24 @@ class TopicOperationsMixins(object):
 
 
 class PublisherOperationsMixins(object):
-    def get_publishers(self, clb=None):
+    def get_publishers(self, topic, clb=None):
         """Returns a list of currently alive ROS Publishers."""
-        req = {}
+        req = {
+            'topic': topic
+        }
         status, data = self._call(clb, req, "/rosapi/publishers", "rosapi/Publishers")
         data = data.get("publishers", None) if not isinstance(data, basestring) else data
         return status, data
 
 
 class SubscriberOperationsMixins(object):
-    def get_subscribers(self, clb=None):
+    def get_subscribers(self, topic, clb=None):
         """Returns a list of currently alive ROS Subscribers."""
-        req = {}
+        req = {
+            'topic': topic
+        }
         status, data = self._call(clb, req, "/rosapi/subscribers", "rosapi/Subscribers")
+        print(data)
         data = data.get("subscribers", None) if not isinstance(data, basestring) else data
         return status, data
 

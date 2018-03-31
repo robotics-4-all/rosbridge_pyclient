@@ -34,11 +34,11 @@ class ROSApiTest(unittest.TestCase):
         self._print("Service [{}] returned: {}".format('/rosapi/node_details', ac))
 
     def test_get_publishers(self):
-        _, ac = self.ros.get_publishers()
+        _, ac = self.ros.get_publishers('/clock')
         self._print("Service [{}] returned: {}".format('/rosapi/publishers', ac))
 
     def test_get_subscribers(self):
-        _, ac = self.ros.get_subscribers()
+        _, ac = self.ros.get_subscribers('/clock')
         self._print("Service [{}] returned: {}".format('/rosapi/subscribers', ac))
 
     def test_get_topics(self):

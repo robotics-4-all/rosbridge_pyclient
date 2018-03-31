@@ -362,7 +362,6 @@ class ExecutorBase(object):
             self._auth_secret = secret
         if self._auth_secret is None:
             return False
-        print(self._auth_secret)
         rand_hex = binascii.b2a_hex(os.urandom(15))
         user_lvl = "admin"
         dest_ip = self._remote_ip
