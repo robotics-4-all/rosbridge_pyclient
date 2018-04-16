@@ -51,7 +51,7 @@ class ExecutorBase(object):
     """
     MAX_RECONNECTIONS = 20
 
-    def __init__(self, ip="127.0.0.1", port=9090, onopen=None, onclose=None):
+    def __init__(self, ip="127.0.0.1", port=9090, onopen=None, onclose=None, onerror=None):
         """Executor class constructor.
 
         Warning: there is a know issue regarding resolving localhost
@@ -76,9 +76,12 @@ class ExecutorBase(object):
         self._action_clients = {}
         self._reconnections = 0
         self._auth_secret = None
+        self._bind_callbacks(onopen, onclose, onerror)
 
-        setattr(self.__class__, "_onopen", onopen)
-        setattr(self.__class__, "_onclose", onclose)
+    def _bind_callbacks(self, onopen=None, onclose=None, onerror=None):
+        setattr(self, "_onopen", onopen)
+        setattr(self, "_onclose", onclose)
+        setattr(self, "_onerror", onerror)
 
     @property
     def remote_uri(self):
@@ -127,27 +130,26 @@ class ExecutorBase(object):
         logger.info("Reason: {0}, Code: {1}".format(reason, code))
         logger.info("Closed down {0} - {1}\nTiming out for a bit...".format(
             code, reason))
-        time.sleep(1)
-        logger.info("Reconnecting. . .")
         # self.sock.shutdown(socket.SHUT_RDWR)
-        try:
-            self.sock.close()
-        except Exception as exc:
-            pass
-        self._reconnections += 1
-        if self._reconnections == self.MAX_RECONNECTIONS:
-            return
-        self.connect()
+        self.sock.close()
+        self.close()
+        if code == 1005:  # Authentication Error
+            if self._onautherror is not None:
+                self._onautherror()
+        #  self._reconnections += 1
+        #  if self._reconnections == self.MAX_RECONNECTIONS:
+            #  return
 
-    def start(self, timeout=1):
+    def start(self, onopen=None, onclose=None, onerror=None):
+        self._bind_callbacks(onopen, onclose, onerror)
         try:
             self.connect()
-        except Exception:
-            newTimeout = timeout + 1
-            logger.info("Timing out for {} seconds. . .".format(newTimeout))
-            time.sleep(newTimeout)
-            logger.info("Attempting to reconnect. . .")
-            self.start(newTimeout)
+            self._connected = True
+        except KeyboardInterrupt:
+            logger.info("SIGINT Caught. Exiting...")
+            self.close()
+        except Exception as exc:
+            logger.info("Connection refused - {}".format(exc))
 
     def received_message(self, msg):
         """Called when message is received from ROSBridge websocket server..
@@ -353,7 +355,8 @@ class ExecutorBase(object):
         if _id in self._action_clients:
             del self._action_clients[_id]
 
-    def authenticate(self, secret=None, secret_from_file=None):
+    def authenticate(self, secret=None, secret_from_file=None, onerror=None):
+        setattr(self, "_onautherror", onerror)
         if secret_from_file is not None:
             if os.path.isfile(secret_from_file):
                 with open(secret_from_file) as f:

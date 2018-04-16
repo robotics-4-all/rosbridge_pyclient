@@ -16,7 +16,7 @@ class AuthenticationTest(unittest.TestCase):
         self.startTime = time.time()
         self._manager = ExecutorManager()
         self._manager.start()
-        self._exec = Executor(ip="83.212.96.15", port=8115)
+        self._exec = Executor(ip="83.212.96.15", port=8127)
         self._exec.connect()
         self._manager.add(self._exec)
         self._count = 0
@@ -30,14 +30,17 @@ class AuthenticationTest(unittest.TestCase):
         self._count += 1
         print(self._count)
 
+    def _onautherror(self):
+        print("AUTHENTICATION ERROR!")
+
     def test_auth_pass_secret(self):
-        self._exec.authenticate("NfMhPEH7LmIMr57U")
+        self._exec.authenticate("DDccaldGJdYNSuod")
         time.sleep(1)
         self._manager.kill()
 
     def test_auth_pass_secret_filepath(self):
-        self._exec.authenticate(secret_from_file=SECRET_FILE)
-        time.sleep(2)
+        self._exec.authenticate(secret_from_file=SECRET_FILE, onerror=self._onautherror)
+        time.sleep(1)
         self._manager.kill()
 
 
