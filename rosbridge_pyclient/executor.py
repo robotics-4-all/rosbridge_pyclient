@@ -501,4 +501,7 @@ class ExecutorManager(WebSocketManager):
         """Gracefully stop all workers"""
         self.close_all()
         self.stop()
-        self.join()
+        try:
+            self.join()
+        except:
+            pass
