@@ -82,8 +82,7 @@ class ActionClient(object):
         logger.info("Feedback: {}".format(msg))
         goal = self._goals.get(msg.get('status').get('goal_id').get('id'))
         if goal:
-            goal.feedback_received(msg.get(
-                'feedback'), msg.get('status'))
+            goal.feedback_received(msg.get('feedback'), msg.get('status'), msg.get('header', None))
 
     def on_result(self, msg):
         """Callback when a result message received.
@@ -92,7 +91,7 @@ class ActionClient(object):
         """
         goal = self._goals.get(msg.get('status').get('goal_id').get('id'))
         if goal:
-            goal.result_received(msg.get('result'), msg.get('status'))
+            goal.result_received(msg.get('result'), msg.get('status'), msg.get('header', None))
 
     def send_goal(self, goal):
         """Send a goal to the ROS action server.
@@ -175,32 +174,24 @@ class Goal(object):
     def is_finished(self):
         return self._is_finished
 
-    def _on_result_wrap(self, msg, status):
-        self._on_result(msg, status)
+    def _on_result_wrap(self, msg, status, header=None):
+        self._on_result(msg, status, header)
 
-    def _on_feedback_wrap(self, msg, status):
-        self._on_feedback(msg, status)
+    def _on_feedback_wrap(self, msg, status, header=None):
+        self._on_feedback(msg, status, header)
 
-    def result_received(self, result, status):
+    def result_received(self, result, status, header=None):
         """Called when a result message is received from the Action Server (AS).
+
         Args:
             result (dict): The result message.
-            status (int): The status code. Such as:
-                ACTIVE = 1: The goal is currently being processed by the AS;
-                PREEMPTED = 2: The goal received a cancel request after it
-                    started executing;
-                SUCCEEDED = 3: The goal was achieved successfully by the AS;
-                ABORTED = 4: The goal was aborted during execution by the AS
-                    due to some failure.
-                For more details, refer to
-                http://docs.ros.org/indigo/api/actionlib_msgs/html/msg/GoalStatus.html.
         """
         self._is_finished = True
         self._message = result
         if callable(self._on_result):
-            self._on_result_wrap(result, status)
+            self._on_result_wrap(result, status, header)
 
-    def feedback_received(self, feedback, status):
+    def feedback_received(self, feedback, status, header=None):
         """Called when a result message is received.
         Args:
             feedback (dict): The feedback message.
@@ -215,7 +206,7 @@ class Goal(object):
                 http://docs.ros.org/indigo/api/actionlib_msgs/html/msg/GoalStatus.html.
         """
         if callable(self._on_feedback):
-            self._on_feedback_wrap(feedback, status)
+            self._on_feedback_wrap(feedback, status, header)
 
     def status_received(self, status):
         """Called when a result message is received.
