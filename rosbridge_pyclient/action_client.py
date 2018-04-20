@@ -52,6 +52,7 @@ class ActionClient(object):
         self._cancel_pub = Publisher(self._executor,
                                      '{0}/cancel'.format(server_name),
                                      'actionlib_msgs/GoalID')
+        self._register()
 
     @property
     def server_name(self):
@@ -70,9 +71,13 @@ class ActionClient(object):
         self._id = val
 
     def on_statusChanged(self, message):
-        goal = self._goals.get(message.get('status_list')[0].get('goal_id').get('id'))
+        try:
+            goal = self._goals.get(message.get('status_list')[0].get('goal_id').get('id'))
+        except Exception as exc:
+            print(exc)
+            return
         if goal:
-            goal.status_received(message.get('status_list'))
+            goal.status_received(message.get('status_list'), message.get('header', None))
 
     def on_feedback(self, msg):
         """Callback when a feedback message received.
@@ -208,7 +213,7 @@ class Goal(object):
         if callable(self._on_feedback):
             self._on_feedback_wrap(feedback, status, header)
 
-    def status_received(self, status):
+    def status_received(self, status, header=None):
         """Called when a result message is received.
         Args:
             feedback (dict): The feedback message.
@@ -223,4 +228,4 @@ class Goal(object):
                 http://docs.ros.org/indigo/api/actionlib_msgs/html/msg/GoalStatus.html.
         """
         if callable(self._on_status):
-            self._on_status(status)
+            self._on_status(status, header=None)

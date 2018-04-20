@@ -347,6 +347,7 @@ class ExecutorBase(object):
         if _id in self._action_clients:
             logger.info("Action client with id={0} already registered!")
         else:
+            logger.info("Registered Action Client: {}".format(_id))
             self._action_clients[_id] = action_client
 
     def unregister_action_client(self, action_client):
