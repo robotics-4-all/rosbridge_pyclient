@@ -228,4 +228,4 @@ class Goal(object):
                 http://docs.ros.org/indigo/api/actionlib_msgs/html/msg/GoalStatus.html.
         """
         if callable(self._on_status):
-            self._on_status(status, header=None)
+            self._on_status(status, header=header)
